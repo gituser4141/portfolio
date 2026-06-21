@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Developer Dungeon // Portfolio</title>
+    <script src="https://cdn.jsdelivr.net/npm/@tailwindcss/browser@4"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&family=Plus+Jakarta+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            margin: 0;
+            background-color: #0d1117;
+            overflow: hidden;
+            font-family: 'Plus Jakarta Sans', sans-serif;
+        }
+        .pixel-text {
+            font-family: 'Press Start 2P', monospace;
+        }
+        canvas {
+            display: block;
+            image-rendering: pixelated;
+        }
+    </style>
+</head>
+<body class="flex flex-col items-center justify-center h-screen w-screen select-none">
+
+    <div class="absolute top-4 left-4 right-4 flex justify-between items-center z-10 pointer-events-none">
+        <div class="bg-[#161b22]/90 border border-[#30363d] px-4 py-2 rounded-lg backdrop-blur shadow-lg pointer-events-auto">
+            <p class="pixel-text text-xs text-emerald-400">ZONE_02: CODE_DUNGEON</p>
+        </div>
+        <div class="bg-[#161b22]/90 border border-[#30363d] px-4 py-2 rounded-lg backdrop-blur shadow-lg pointer-events-auto">
+            <p class="text-xs text-gray-400 font-semibold">Press <span class="bg-[#21262d] px-1.5 py-0.5 rounded border border-[#30363d] text-white">WASD</span> or <span class="bg-[#21262d] px-1.5 py-0.5 rounded border border-[#30363d] text-white">Arrows</span> to Move</p>
+        </div>
+    </div>
+
+    <div class="relative shadow-2xl rounded-xl overflow-hidden border-2 border-[#30363d] bg-black">
+        <canvas id="gameCanvas" width="800" height="480"></canvas>
+    </div>
+
+    <div id="projectModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+        <div class="bg-[#161b22] border border-[#30363d] w-full max-w-lg rounded-xl overflow-hidden shadow-2xl animate-in fade-in zoom-in-95 duration-200">
+            <div class="border-b border-[#30363d] bg-[#0d1117] p-4 flex justify-between items-center">
+                <h3 id="modalTitle" class="pixel-text text-sm text-emerald-400">PROJECT_NODE</h3>
+                <button onclick="closeModal()" class="text-gray-400 hover:text-white transition-colors text-xl font-bold cursor-pointer">&times;</button>
+            </div>
+            <div class="p-6 space-y-4">
+                <p id="modalDesc" class="text-gray-300 leading-relaxed"></p>
+                
+                <div>
+                    <h4 class="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Tech Stack</h4>
+                    <div id="modalTags" class="flex flex-wrap gap-2"></div>
+                </div>
+            </div>
+            <div class="border-t border-[#30363d] bg-[#0d1117] p-4 flex justify-end gap-3">
+                <button onclick="closeModal()" class="px-4 py-2 rounded-lg text-sm font-semibold text-gray-400 hover:text-white hover:bg-[#21262d] transition-all cursor-pointer">Close Engine</button>
+                <a id="modalLink" href="#" target="_blank" class="px-4 py-2 rounded-lg text-sm font-semibold bg-emerald-500 hover:bg-emerald-400 text-black transition-all shadow-lg shadow-emerald-500/20 cursor-pointer">Examine Source (GitHub)</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+       const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
+
+// Grid configurations
+const TILE_SIZE = 48;
+const MAP_ROWS = 10;
+const MAP_COLS = 16;
+
+// Game State Engine Blocks (0 = Floor, 1 = Wall, 2 = C Engine, 3 = SQL Vault, 4 = Web Core)
+const dungeonMap = [
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1],
+    [1,0,0,0,0,1,0,0,0,0,0,1,0,0,2,1],
+    [1,0,1,1,0,1,0,1,1,1,0,1,0,1,1,1],
+    [1,0,1,0,0,0,0,0,0,1,0,0,0,0,0,1],
+    [1,0,1,0,1,1,3,1,0,1,1,1,1,1,0,1],
+    [1,0,0,0,1,0,0,1,0,0,0,0,0,1,0,1],
+    [1,1,1,0,1,0,0,1,1,1,1,1,0,1,0,1],
+    [1,0,0,0,0,0,0,0,0,0,0,1,0,0,0,1],
+    [1,4,0,1,1,1,1,1,1,1,0,0,0,0,0,1],
+    [1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1]
+];
+
+// Player specs
+const player = {
+    x: 2 * TILE_SIZE,
+    y: 7 * TILE_SIZE,
+    size: 24,
+    speed: 4,
+    color: '#38bdf8'
+};
+
+// UI Window Lock State
+let isModalOpen = false;
+
+// Keyboard controls tracking
+const keys = { w: false, a: false, s: false, d: false, ArrowUp: false, ArrowDown: false, ArrowLeft: false, ArrowRight: false };
+
+window.addEventListener('keydown', e => { 
+    if (isModalOpen) return; // Completely freeze input capture if window is up
+    if (e.key in keys) keys[e.key] = true; 
+});
+window.addEventListener('keyup', e => { 
+    if (e.key in keys) keys[e.key] = false; 
+});
+
+// Project Data Map
+const projectData = {
+    2: {
+        title: "DATA_STRUCTURES_LAB.EXE",
+        desc: "Deep-dive system engineering modules. Implements low-level data tracking algorithms, customized memory allocation matrices, and high-performance Circular Queue tracking loops engineered natively in pure C syntax.",
+        tags: ["C Programming", "Data Structures", "Memory Management", "Algorithms"],
+        link: "https://github.com"
+    },
+    3: {
+        title: "SQL_RELATIONAL_VAULT.DB",
+        desc: "High-volume structural database schema architectures. Includes recursive subqueries, transactional safe layers, and index scaling layouts designed to optimize microservice data pipelines.",
+        tags: ["SQL", "PostgreSQL", "Database Design", "Query Optimization"],
+        link: "https://github.com"
+    },
+    4: {
+        title: "WEB_CORE_FRAMEWORK.JS",
+        desc: "Dynamic web stack deployment setups constructed during active development pipelines. Features optimized event architecture loops natively tying asynchronous JavaScript actions with structured PHP runtime operations.",
+        tags: ["JavaScript", "PHP", "Tailwind CSS", "Full-Stack"],
+        link: "https://github.com"
+    }
+};
+
+// Tile collision verification
+function isWalkable(px, py) {
+    const buffer = 4; 
+    const checkPoints = [
+        {x: px + buffer, y: py + buffer},
+        {x: px + player.size - buffer, y: py + buffer},
+        {x: px + buffer, y: py + player.size - buffer},
+        {x: px + player.size - buffer, y: py + player.size - buffer}
+    ];
+
+    for (let pt of checkPoints) {
+        const col = Math.floor(pt.x / TILE_SIZE);
+        const row = Math.floor(pt.y / TILE_SIZE);
+        
+        if (row < 0 || row >= MAP_ROWS || col < 0 || col >= MAP_COLS) return false;
+        if (dungeonMap[row][col] === 1) return false; 
+    }
+    return true;
+}
+
+// Interaction processing logic
+function checkInteractions() {
+    if (isModalOpen) return; // Don't check for intersections if window is already active
+
+    const centerX = player.x + player.size / 2;
+    const centerY = player.y + player.size / 2;
+    const col = Math.floor(centerX / TILE_SIZE);
+    const row = Math.floor(centerY / TILE_SIZE);
+    
+    const currentTileValue = dungeonMap[row][col];
+    if ([2, 3, 4].includes(currentTileValue)) {
+        openModal(currentTileValue, row, col);
+    }
+}
+
+// Engine Updates
+function update() {
+    if (isModalOpen) return; // Freeze engine processing loop if modal is active
+
+    let targetX = player.x;
+    let targetY = player.y;
+
+    if (keys.w || keys.ArrowUp) targetY -= player.speed;
+    if (keys.s || keys.ArrowDown) targetY += player.speed;
+    if (isWalkable(player.x, targetY)) player.y = targetY;
+
+    if (keys.a || keys.ArrowLeft) targetX -= player.speed;
+    if (keys.d || keys.ArrowRight) targetX += player.speed;
+    if (isWalkable(targetX, player.y)) player.x = targetX;
+
+    checkInteractions();
+}
+
+// Engine Render Passes
+function draw() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    // 1. Render Map Environment Grid
+    for (let r = 0; r < MAP_ROWS; r++) {
+        for (let c = 0; c < MAP_COLS; c++) {
+            const tileType = dungeonMap[r][c];
+            const tx = c * TILE_SIZE;
+            const ty = r * TILE_SIZE;
+
+            if (tileType === 1) {
+                ctx.fillStyle = '#1f2937';
+                ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = '#374151';
+                ctx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
+            } else {
+                ctx.fillStyle = '#090d16';
+                ctx.fillRect(tx, ty, TILE_SIZE, TILE_SIZE);
+                ctx.strokeStyle = '#111827';
+                ctx.strokeRect(tx, ty, TILE_SIZE, TILE_SIZE);
+
+                if (tileType === 2) drawNode(tx, ty, '#10b981', 'C');
+                if (tileType === 3) drawNode(tx, ty, '#f59e0b', 'SQL');
+                if (tileType === 4) drawNode(tx, ty, '#6366f1', 'WEB');
+            }
+        }
+    }
+
+    // 2. Render Player Entity Sprite
+    ctx.fillStyle = player.color;
+    ctx.beginPath();
+    ctx.roundRect(player.x, player.y, player.size, player.size, 6);
+    ctx.fill();
+    
+    ctx.fillStyle = '#ffffff';
+    ctx.fillRect(player.x + 6, player.y + 6, 4, 4);
+}
+
+function drawNode(x, y, color, label) {
+    const pulse = Math.sin(Date.now() / 200) * 3;
+    ctx.fillStyle = color;
+    ctx.shadowBlur = 10 + pulse;
+    ctx.shadowColor = color;
+    ctx.beginPath();
+    ctx.arc(x + TILE_SIZE/2, y + TILE_SIZE/2, 12 + pulse/2, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0; 
+
+    ctx.fillStyle = '#ffffff';
+    ctx.font = '8px "Press Start 2P"';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, x + TILE_SIZE/2, y + TILE_SIZE/2 + 3);
+}
+
+// Modal State Controller Handling
+function openModal(id, row, col) {
+    isModalOpen = true; 
+    
+    // Clear keyboard states cleanly
+    Object.keys(keys).forEach(k => keys[k] = false);
+
+    const data = projectData[id];
+    document.getElementById('modalTitle').innerText = data.title;
+    document.getElementById('modalDesc').innerText = data.desc;
+    document.getElementById('modalLink').href = data.link;
+
+    const tagsContainer = document.getElementById('modalTags');
+    tagsContainer.innerHTML = '';
+    data.tags.forEach(tag => {
+        const badge = document.createElement('span');
+        badge.className = 'px-2.5 py-1 text-xs font-semibold rounded-md bg-[#21262d] border border-[#30363d] text-gray-300';
+        badge.innerText = tag;
+        tagsContainer.appendChild(badge);
+    });
+
+    document.getElementById('projectModal').classList.remove('hidden');
+
+    // Eject player back onto an adjacent floor tile to prevent sticky loops
+    const escapeRoutes = [
+        { r: row + 1, c: col },
+        { r: row - 1, c: col },
+        { r: row, c: col + 1 },
+        { r: row, c: col - 1 }
+    ];
+
+    for (let route of escapeRoutes) {
+        if (route.r >= 0 && route.r < MAP_ROWS && route.c >= 0 && route.c < MAP_COLS) {
+            if (dungeonMap[route.r][route.c] === 0) { // Found empty floor
+                player.x = route.c * TILE_SIZE + (TILE_SIZE - player.size) / 2;
+                player.y = route.r * TILE_SIZE + (TILE_SIZE - player.size) / 2;
+                break;
+            }
+        }
+    }
+}
+
+function closeModal() {
+    document.getElementById('projectModal').classList.add('hidden');
+    // Add a tiny delay before unlocking engine to ensure transition frames clear smoothly
+    setTimeout(() => {
+        isModalOpen = false;
+    }, 50);
+}
+
+// Synchronized Game Loop
+function gameLoop() {
+    update();
+    draw();
+    requestAnimationFrame(gameLoop);
+}
+
+gameLoop();
+    </script>
+</body>
+</html>
